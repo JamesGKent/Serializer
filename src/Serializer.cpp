@@ -49,22 +49,17 @@ uint8_t _Serializer::padding() {
 
 _Serializer Serializer;
 
-#if defined(HAVE_HWSERIAL0) || defined(HAVE_CDCSERIAL)
-void _SerialServer::add_response(char request[], void* response, uint16_t size) {
+#if defined(HAVE_HWSERIAL0) || \
+	defined(HAVE_CDCSERIAL) || \
+	defined(HAVE_HWSERIAL1) || \
+	defined(HAVE_HWSERIAL2) || \
+	defined(HAVE_HWSERIAL3)
+response_t* _SerialServerBase::add_response() {
 	if (queue == NULL){
 		queue = new response_t;
-		queue->request = request;
-		queue->response = response;
-		queue->size = size;
-		queue->next = NULL;
-		rec_buf = new char[rec_buf_size];
+		return queue;
 	} else {
 		response_t* resp = new response_t;
-		resp->request = request;
-		resp->response = response;
-		resp->size = size;
-		resp->next = NULL;
-		
 		response_t* last;
 		response_t* next = queue;
 		while (next != NULL) {
@@ -72,9 +67,26 @@ void _SerialServer::add_response(char request[], void* response, uint16_t size) 
 			next = (response_t*)last->next;
 		}
 		last->next = resp;
+		return resp;
 	}
 }
 
+void _SerialServerBase::add_response(char request[], void* response, uint16_t size) {
+	response_t* resp = add_response();
+	resp->request = request;
+	resp->response = response;
+	resp->size = size;
+	resp->next = NULL;
+	if ((strlen(request)*2)>rec_buf_size)
+		rec_buf_size = strlen(request)*2;
+		if (rec_buf != NULL)
+			delete rec_buf;
+	if (rec_buf == NULL)
+		rec_buf = new char[rec_buf_size];
+}
+#endif
+
+#if defined(HAVE_HWSERIAL0) || defined(HAVE_CDCSERIAL)
 bool _SerialServer::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
 	Serial.write(request);
 	Serial.write('\r');
@@ -152,31 +164,6 @@ _SerialServer SerialServer;
 #endif
 
 #if defined(HAVE_HWSERIAL1)
-void _SerialServer1::add_response(char request[], void* response, uint16_t size) {
-	if (queue == NULL){
-		queue = new response_t;
-		queue->request = request;
-		queue->response = response;
-		queue->size = size;
-		queue->next = NULL;
-		rec_buf = new char[rec_buf_size];
-	} else {
-		response_t* resp = new response_t;
-		resp->request = request;
-		resp->response = response;
-		resp->size = size;
-		resp->next = NULL;
-		
-		response_t* last;
-		response_t* next = queue;
-		while (next != NULL) {
-			last = next;
-			next = (response_t*)last->next;
-		}
-		last->next = resp;
-	}
-}
-
 bool _SerialServer1::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
 	Serial1.write(request);
 	Serial1.write('\r');
@@ -254,31 +241,6 @@ _SerialServer1 SerialServer1;
 #endif
 
 #if defined(HAVE_HWSERIAL2)
-void _SerialServer2::add_response(char request[], void* response, uint16_t size) {
-	if (queue == NULL){
-		queue = new response_t;
-		queue->request = request;
-		queue->response = response;
-		queue->size = size;
-		queue->next = NULL;
-		rec_buf = new char[rec_buf_size];
-	} else {
-		response_t* resp = new response_t;
-		resp->request = request;
-		resp->response = response;
-		resp->size = size;
-		resp->next = NULL;
-		
-		response_t* last;
-		response_t* next = queue;
-		while (next != NULL) {
-			last = next;
-			next = (response_t*)last->next;
-		}
-		last->next = resp;
-	}
-}
-
 bool _SerialServer2::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
 	Serial2.write(request);
 	Serial2.write('\r');
@@ -356,31 +318,6 @@ _SerialServer2 SerialServer2;
 #endif
 
 #if defined(HAVE_HWSERIAL3)
-void _SerialServer3::add_response(char request[], void* response, uint16_t size) {
-	if (queue == NULL){
-		queue = new response_t;
-		queue->request = request;
-		queue->response = response;
-		queue->size = size;
-		queue->next = NULL;
-		rec_buf = new char[rec_buf_size];
-	} else {
-		response_t* resp = new response_t;
-		resp->request = request;
-		resp->response = response;
-		resp->size = size;
-		resp->next = NULL;
-		
-		response_t* last;
-		response_t* next = queue;
-		while (next != NULL) {
-			last = next;
-			next = (response_t*)last->next;
-		}
-		last->next = resp;
-	}
-}
-
 bool _SerialServer3::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
 	Serial3.write(request);
 	Serial3.write('\r');
