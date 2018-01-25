@@ -177,6 +177,44 @@ void _SerialServer1::add_response(char request[], void* response, uint16_t size)
 	}
 }
 
+bool _SerialServer1::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
+	Serial1.write(request);
+	Serial1.write('\r');
+	uint32_t start_time = millis();
+	uint16_t tmp_buf_size = (size+Serializer.padding()) * 3;
+	char tmp_buf[tmp_buf_size];
+	memset(tmp_buf, 0, tmp_buf_size);
+	uint16_t i=0;
+	while ((millis() - start_time) < timeout) {
+		if (Serial1.available() > 0) {
+			scratch = Serial.read();
+			tmp_buf[i] = scratch;
+			i++;
+			if ((scratch == 0) && (i > 1)) {
+				if (tmp_buf[i-2] == 0){ // footer conditions are met, try update variables
+					// this command only updates the object after header, checksum and footer are verified
+					// so object can be reasonably assumed to always contain valid data
+					int status = Serializer.unpack(tmp_buf, response, size);
+					switch (status){
+					case OK:
+						return true;
+					case INCOMPLETE_PACKET: // means checksum in buffer is 0 but calculated isn't. indicates not recieved whole packet yet
+						break;
+					case CHECKSUM_FAILED:
+						return false;
+					case FOOTER_MISSING:
+						return false;
+					}
+					if (i >= tmp_buf_size) {
+						return false;
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
+
 void _SerialServer1::handle_requests() {
 	while (Serial1.available() > 0) {
 		scratch = Serial1.read();
@@ -241,6 +279,44 @@ void _SerialServer2::add_response(char request[], void* response, uint16_t size)
 	}
 }
 
+bool _SerialServer2::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
+	Serial2.write(request);
+	Serial2.write('\r');
+	uint32_t start_time = millis();
+	uint16_t tmp_buf_size = (size+Serializer.padding()) * 3;
+	char tmp_buf[tmp_buf_size];
+	memset(tmp_buf, 0, tmp_buf_size);
+	uint16_t i=0;
+	while ((millis() - start_time) < timeout) {
+		if (Serial2.available() > 0) {
+			scratch = Serial.read();
+			tmp_buf[i] = scratch;
+			i++;
+			if ((scratch == 0) && (i > 1)) {
+				if (tmp_buf[i-2] == 0){ // footer conditions are met, try update variables
+					// this command only updates the object after header, checksum and footer are verified
+					// so object can be reasonably assumed to always contain valid data
+					int status = Serializer.unpack(tmp_buf, response, size);
+					switch (status){
+					case OK:
+						return true;
+					case INCOMPLETE_PACKET: // means checksum in buffer is 0 but calculated isn't. indicates not recieved whole packet yet
+						break;
+					case CHECKSUM_FAILED:
+						return false;
+					case FOOTER_MISSING:
+						return false;
+					}
+					if (i >= tmp_buf_size) {
+						return false;
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
+
 void _SerialServer2::handle_requests() {
 	while (Serial2.available() > 0) {
 		scratch = Serial2.read();
@@ -303,6 +379,44 @@ void _SerialServer3::add_response(char request[], void* response, uint16_t size)
 		}
 		last->next = resp;
 	}
+}
+
+bool _SerialServer3::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
+	Serial3.write(request);
+	Serial3.write('\r');
+	uint32_t start_time = millis();
+	uint16_t tmp_buf_size = (size+Serializer.padding()) * 3;
+	char tmp_buf[tmp_buf_size];
+	memset(tmp_buf, 0, tmp_buf_size);
+	uint16_t i=0;
+	while ((millis() - start_time) < timeout) {
+		if (Serial3.available() > 0) {
+			scratch = Serial.read();
+			tmp_buf[i] = scratch;
+			i++;
+			if ((scratch == 0) && (i > 1)) {
+				if (tmp_buf[i-2] == 0){ // footer conditions are met, try update variables
+					// this command only updates the object after header, checksum and footer are verified
+					// so object can be reasonably assumed to always contain valid data
+					int status = Serializer.unpack(tmp_buf, response, size);
+					switch (status){
+					case OK:
+						return true;
+					case INCOMPLETE_PACKET: // means checksum in buffer is 0 but calculated isn't. indicates not recieved whole packet yet
+						break;
+					case CHECKSUM_FAILED:
+						return false;
+					case FOOTER_MISSING:
+						return false;
+					}
+					if (i >= tmp_buf_size) {
+						return false;
+					}
+				}
+			}
+		}
+	}
+	return false;
 }
 
 void _SerialServer3::handle_requests() {
