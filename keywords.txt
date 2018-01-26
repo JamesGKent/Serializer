@@ -5,6 +5,7 @@
 #######################################
 # Datatypes (KEYWORD1)
 #######################################
+SerialServerClass	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
@@ -12,14 +13,25 @@
 
 pack	KEYWORD2
 unpack	KEYWORD2
+add_response	KEYWORD2
+make_request	KEYWORD2
+handle_requests	KEYWORD2
 
 #######################################
 # Instances (KEYWORD2)
 #######################################
 
 Serializer	KEYWORD2
+SerialServer	KEYWORD2
+SerialServer1	KEYWORD2
+SerialServer2	KEYWORD2
+SerialServer3	KEYWORD2
 
 #######################################
 # Constants (LITERAL1)
 #######################################
 
+OK	LITERAL1
+CHECKSUM_FAILED	LITERAL1
+FOOTER_MISSING	LITERAL1
+INCOMPLETE_PACKET	LITERAL1

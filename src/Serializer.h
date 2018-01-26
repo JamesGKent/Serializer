@@ -30,9 +30,9 @@ typedef struct {
 	void* next;
 } response_t;
 
-class SerialServer {
+class SerialServerClass {
 public:
-	SerialServer(Stream &port);
+	SerialServerClass(Stream &port);
 	void add_response(char request[], void* response, uint16_t size);
 	void add_response(char request[], void (*function)(void));
 	bool make_request(char request[], void* response, uint16_t size, uint32_t timeout=1000);
@@ -48,3 +48,19 @@ private:
 	uint16_t rec_index;
 	char scratch;
 };
+
+#if defined(HAVE_HWSERIAL0) || defined(HAVE_CDCSERIAL)
+extern SerialServerClass SerialServer;
+#endif
+
+#if defined(HAVE_HWSERIAL1)
+extern SerialServerClass SerialServer1;
+#endif
+
+#if defined(HAVE_HWSERIAL2)
+extern SerialServerClass SerialServer2;
+#endif
+
+#if defined(HAVE_HWSERIAL3)
+extern SerialServerClass SerialServer3;
+#endif

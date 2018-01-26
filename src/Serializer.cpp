@@ -49,11 +49,11 @@ uint8_t _Serializer::padding() {
 
 _Serializer Serializer;
 
-SerialServer::SerialServer(Stream &port) {
+SerialServerClass::SerialServerClass(Stream &port) {
 	ser = &port;
 }
 
-response_t* SerialServer::add_response() {
+response_t* SerialServerClass::add_response() {
 	if (queue == NULL){
 		queue = new response_t;
 		queue->next = NULL;
@@ -72,7 +72,7 @@ response_t* SerialServer::add_response() {
 	}
 }
 
-void SerialServer::add_response(char request[], void* response, uint16_t size) {
+void SerialServerClass::add_response(char request[], void* response, uint16_t size) {
 	response_t* resp = add_response();
 	resp->request = request;
 	resp->response = response;
@@ -85,7 +85,7 @@ void SerialServer::add_response(char request[], void* response, uint16_t size) {
 		rec_buf = new char[rec_buf_size];
 }
 
-void SerialServer::add_response(char request[], void (*function)(void)) {
+void SerialServerClass::add_response(char request[], void (*function)(void)) {
 	response_t* resp = add_response();
 	resp->request = request;
 	resp->size = 0;
@@ -98,7 +98,7 @@ void SerialServer::add_response(char request[], void (*function)(void)) {
 		rec_buf = new char[rec_buf_size];
 }
 
-bool SerialServer::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
+bool SerialServerClass::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
 	ser->write(request);
 	ser->write('\r');
 	uint32_t start_time = millis();
@@ -136,7 +136,7 @@ bool SerialServer::make_request(char request[], void* response, uint16_t size, u
 	return false;
 }
 
-void SerialServer::handle_requests() {
+void SerialServerClass::handle_requests() {
 	while (ser->available() > 0) {
 		scratch = ser->read();
 		switch (scratch) {
@@ -174,3 +174,19 @@ void SerialServer::handle_requests() {
 		}
 	}
 }
+
+#if defined(HAVE_HWSERIAL0) || defined(HAVE_CDCSERIAL)
+SerialServerClass SerialServer(Serial);
+#endif
+
+#if defined(HAVE_HWSERIAL1)
+SerialServerClass SerialServer1(Serial1);
+#endif
+
+#if defined(HAVE_HWSERIAL2)
+SerialServerClass SerialServer2(Serial2);
+#endif
+
+#if defined(HAVE_HWSERIAL3)
+SerialServerClass SerialServer3(Serial3);
+#endif
