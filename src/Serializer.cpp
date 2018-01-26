@@ -1,6 +1,20 @@
 #include <Arduino.h>
 #include <Serializer.h>
 
+void _Serializer::pack(Stream &port, void* data, uint16_t size) {
+	uint8_t checksum = 0;
+	for (uint8_t i=0; i<headerlength; i++)
+		port.write((char)255);
+	char* buf = (char*)data;
+	port.write(buf, size);
+	for (uint16_t i=0; i<size; i++) {
+		checksum ^= buf[i];
+	}
+	port.write(checksum);
+	for (uint8_t i=0; i<footerlength; i++)
+		port.write((uint8_t)0);
+}
+
 void _Serializer::pack(char buffer[], void* data, uint16_t size) {
     uint8_t checksum = 0;
 	for (uint8_t i=0; i<headerlength; i++)
@@ -98,9 +112,44 @@ void SerialServerClass::add_response(char request[], void (*function)(void)) {
 		rec_buf = new char[rec_buf_size];
 }
 
+periodical_t* SerialServerClass::add_periodical() {
+	if (periodicals == NULL){
+		periodicals = new periodical_t;
+		periodicals->next = NULL;
+		return periodicals;
+	} else {
+		periodical_t* per = new periodical_t;
+		periodical_t* last;
+		periodical_t* next = periodicals;
+		while (next != NULL) {
+			last = next;
+			next = (periodical_t*)last->next;
+		}
+		last->next = per;
+		per->next = NULL;
+		return per;
+	}
+}
+
 bool SerialServerClass::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
 	ser->write(request);
 	ser->write('\r');
+	return recieve(response, size, timeout);
+}
+
+bool SerialServerClass::send_periodically(void* response, uint16_t size, uint32_t period) {
+	periodical_t* per = add_periodical();
+	per->response = response;
+	per->size = size;
+	per->period = period;
+	per->last_sent = 0;
+}
+
+bool SerialServerClass::send(void* response, uint16_t size) {
+	Serializer.pack(*ser, response, size);
+}
+
+bool SerialServerClass::recieve(void* response, uint16_t size, uint32_t timeout) {
 	uint32_t start_time = millis();
 	uint16_t tmp_buf_size = (size+Serializer.padding()) * 3;
 	char tmp_buf[tmp_buf_size];
@@ -152,9 +201,7 @@ void SerialServerClass::handle_requests() {
 								if (last->size == 0) {
 									(*last->function)();
 								} else {
-									char buf[last->size + Serializer.padding()];
-									Serializer.pack(buf, last->response, last->size);
-									ser->write(buf, last->size + Serializer.padding());
+									Serializer.pack(*ser, last->response, last->size);
 								}
 							}
 							next = (response_t*)last->next;
@@ -172,6 +219,16 @@ void SerialServerClass::handle_requests() {
 					memset(rec_buf, 0, rec_buf_size);
 				}
 		}
+	}
+	periodical_t* last;
+	periodical_t* next = periodicals;
+	while (next != NULL) {
+		last = next;
+		if ((millis() - last->last_sent) > last->period) {
+			Serializer.pack(*ser, last->response, last->size);
+			last->last_sent = millis();
+		};
+		next = (periodical_t*)last->next;
 	}
 }
 

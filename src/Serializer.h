@@ -8,6 +8,7 @@ enum SerializerStatus{
 
 class _Serializer {
 public:
+	void pack(Stream &port, void* data, uint16_t size);
     void pack(char buffer[], void* data, uint16_t size);
     SerializerStatus unpack(char buffer[], void* data, uint16_t size);
 	
@@ -30,18 +31,32 @@ typedef struct {
 	void* next;
 } response_t;
 
+typedef struct {
+	void* response;
+	uint16_t size;
+	uint32_t period;
+	uint32_t last_sent;
+	void* next;
+} periodical_t;
+
 class SerialServerClass {
 public:
 	SerialServerClass(Stream &port);
 	void add_response(char request[], void* response, uint16_t size);
 	void add_response(char request[], void (*function)(void));
 	bool make_request(char request[], void* response, uint16_t size, uint32_t timeout=1000);
+	bool send_periodically(void* response, uint16_t size, uint32_t period);
+	bool send(void* response, uint16_t size);
+	bool recieve(void* response, uint16_t size, uint32_t timeout=1000);
 	void handle_requests();
 private:
 	response_t* add_response(); // adds empty response to the queue
 	
+	periodical_t* add_periodical(); 
+	
 	Stream* ser; // reference to the port in use
 	response_t* queue=NULL; // list of all the responses
+	periodical_t* periodicals=NULL; // list of messages to send periodically
 	uint16_t rec_buf_size = 32; // initial buffer size
 	char* rec_buf; // pointer to buffer
 	
