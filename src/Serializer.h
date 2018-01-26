@@ -32,18 +32,19 @@ typedef struct {
 
 class SerialServer {
 public:
-	SerialServer(Stream* port=NULL);
+	SerialServer(Stream &port);
 	void add_response(char request[], void* response, uint16_t size);
 	void add_response(char request[], void (*function)(void));
 	bool make_request(char request[], void* response, uint16_t size, uint32_t timeout=1000);
 	void handle_requests();
 private:
-	response_t* add_response();
+	response_t* add_response(); // adds empty response to the queue
 	
-	Stream* ser;
-	response_t* queue=NULL;
-	uint16_t rec_buf_size = 32;
-	char* rec_buf;
+	Stream* ser; // reference to the port in use
+	response_t* queue=NULL; // list of all the responses
+	uint16_t rec_buf_size = 32; // initial buffer size
+	char* rec_buf; // pointer to buffer
+	
 	uint16_t rec_index;
 	char scratch;
 };

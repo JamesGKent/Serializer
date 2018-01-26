@@ -49,8 +49,8 @@ uint8_t _Serializer::padding() {
 
 _Serializer Serializer;
 
-SerialServer::SerialServer(Stream* port) {
-	ser = port;
+SerialServer::SerialServer(Stream &port) {
+	ser = &port;
 }
 
 response_t* SerialServer::add_response() {

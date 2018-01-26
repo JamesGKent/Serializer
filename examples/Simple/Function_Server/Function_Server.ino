@@ -1,6 +1,6 @@
 #include <Serializer.h>
 
-SerialServer srv(&Serial);
+SerialServer server(Serial);
 
 void myfunction() {
 	Serial.println("Test function");
@@ -8,9 +8,9 @@ void myfunction() {
 
 void setup() {
 	Serial.begin(57600);
-	srv.add_response("function", myfunction);
+	server.add_response("function", myfunction);
 }
 
 void loop() {
-	srv.handle_requests();
+	server.handle_requests();
 }
