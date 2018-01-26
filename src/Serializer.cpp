@@ -49,14 +49,14 @@ uint8_t _Serializer::padding() {
 
 _Serializer Serializer;
 
-#if defined(HAVE_HWSERIAL0) || \
-	defined(HAVE_CDCSERIAL) || \
-	defined(HAVE_HWSERIAL1) || \
-	defined(HAVE_HWSERIAL2) || \
-	defined(HAVE_HWSERIAL3)
-response_t* _SerialServerBase::add_response() {
+SerialServerClass::SerialServerClass(Stream &port) {
+	ser = &port;
+}
+
+response_t* SerialServerClass::add_response() {
 	if (queue == NULL){
 		queue = new response_t;
+		queue->next = NULL;
 		return queue;
 	} else {
 		response_t* resp = new response_t;
@@ -67,16 +67,16 @@ response_t* _SerialServerBase::add_response() {
 			next = (response_t*)last->next;
 		}
 		last->next = resp;
+		resp->next = NULL;
 		return resp;
 	}
 }
 
-void _SerialServerBase::add_response(char request[], void* response, uint16_t size) {
+void SerialServerClass::add_response(char request[], void* response, uint16_t size) {
 	response_t* resp = add_response();
 	resp->request = request;
 	resp->response = response;
 	resp->size = size;
-	resp->next = NULL;
 	if ((strlen(request)*2)>rec_buf_size)
 		rec_buf_size = strlen(request)*2;
 		if (rec_buf != NULL)
@@ -84,20 +84,31 @@ void _SerialServerBase::add_response(char request[], void* response, uint16_t si
 	if (rec_buf == NULL)
 		rec_buf = new char[rec_buf_size];
 }
-#endif
 
-#if defined(HAVE_HWSERIAL0) || defined(HAVE_CDCSERIAL)
-bool _SerialServer::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
-	Serial.write(request);
-	Serial.write('\r');
+void SerialServerClass::add_response(char request[], void (*function)(void)) {
+	response_t* resp = add_response();
+	resp->request = request;
+	resp->size = 0;
+	resp->function = function;
+	if ((strlen(request)*2)>rec_buf_size)
+		rec_buf_size = strlen(request)*2;
+		if (rec_buf != NULL)
+			delete rec_buf;
+	if (rec_buf == NULL)
+		rec_buf = new char[rec_buf_size];
+}
+
+bool SerialServerClass::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
+	ser->write(request);
+	ser->write('\r');
 	uint32_t start_time = millis();
 	uint16_t tmp_buf_size = (size+Serializer.padding()) * 3;
 	char tmp_buf[tmp_buf_size];
 	memset(tmp_buf, 0, tmp_buf_size);
 	uint16_t i=0;
 	while ((millis() - start_time) < timeout) {
-		if (Serial.available() > 0) {
-			scratch = Serial.read();
+		if (ser->available() > 0) {
+			scratch = ser->read();
 			tmp_buf[i] = scratch;
 			i++;
 			if ((scratch == 0) && (i > 1)) {
@@ -125,9 +136,9 @@ bool _SerialServer::make_request(char request[], void* response, uint16_t size, 
 	return false;
 }
 
-void _SerialServer::handle_requests() {
-	while (Serial.available() > 0) {
-		scratch = Serial.read();
+void SerialServerClass::handle_requests() {
+	while (ser->available() > 0) {
+		scratch = ser->read();
 		switch (scratch) {
 			case '\r': // carraige return
 			case '\n': // linefeed
@@ -138,9 +149,13 @@ void _SerialServer::handle_requests() {
 						while (next != NULL) {
 							last = next;
 							if (strcmp(last->request, rec_buf) == 0) {
-								char buf[last->size + Serializer.padding()];
-								Serializer.pack(buf, last->response, last->size);
-								Serial.write(buf, last->size + Serializer.padding());
+								if (last->size == 0) {
+									(*last->function)();
+								} else {
+									char buf[last->size + Serializer.padding()];
+									Serializer.pack(buf, last->response, last->size);
+									ser->write(buf, last->size + Serializer.padding());
+								}
 							}
 							next = (response_t*)last->next;
 						}
@@ -160,236 +175,18 @@ void _SerialServer::handle_requests() {
 	}
 }
 
-_SerialServer SerialServer;
+#if defined(HAVE_HWSERIAL0) || defined(HAVE_CDCSERIAL)
+SerialServerClass SerialServer(Serial);
 #endif
 
 #if defined(HAVE_HWSERIAL1)
-bool _SerialServer1::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
-	Serial1.write(request);
-	Serial1.write('\r');
-	uint32_t start_time = millis();
-	uint16_t tmp_buf_size = (size+Serializer.padding()) * 3;
-	char tmp_buf[tmp_buf_size];
-	memset(tmp_buf, 0, tmp_buf_size);
-	uint16_t i=0;
-	while ((millis() - start_time) < timeout) {
-		if (Serial1.available() > 0) {
-			scratch = Serial.read();
-			tmp_buf[i] = scratch;
-			i++;
-			if ((scratch == 0) && (i > 1)) {
-				if (tmp_buf[i-2] == 0){ // footer conditions are met, try update variables
-					// this command only updates the object after header, checksum and footer are verified
-					// so object can be reasonably assumed to always contain valid data
-					int status = Serializer.unpack(tmp_buf, response, size);
-					switch (status){
-					case OK:
-						return true;
-					case INCOMPLETE_PACKET: // means checksum in buffer is 0 but calculated isn't. indicates not recieved whole packet yet
-						break;
-					case CHECKSUM_FAILED:
-						return false;
-					case FOOTER_MISSING:
-						return false;
-					}
-					if (i >= tmp_buf_size) {
-						return false;
-					}
-				}
-			}
-		}
-	}
-	return false;
-}
-
-void _SerialServer1::handle_requests() {
-	while (Serial1.available() > 0) {
-		scratch = Serial1.read();
-		switch (scratch) {
-			case '\r': // carraige return
-			case '\n': // linefeed
-				if (strlen(rec_buf) > 0) {
-					if (queue != NULL) {
-						response_t* last;
-						response_t* next = queue;
-						while (next != NULL) {
-							last = next;
-							if (strcmp(last->request, rec_buf) == 0) {
-								char buf[last->size + Serializer.padding()];
-								Serializer.pack(buf, last->response, last->size);
-								Serial1.write(buf, last->size + Serializer.padding());
-							}
-							next = (response_t*)last->next;
-						}
-					}
-				}
-				rec_index = 0;
-				memset(rec_buf, 0, rec_buf_size);
-				break;
-			default:
-				rec_buf[rec_index] = scratch;
-				rec_index++;
-				if (rec_index >= rec_buf_size) {
-					rec_index = 0;
-					memset(rec_buf, 0, rec_buf_size);
-				}
-		}
-	}
-}
-
-_SerialServer1 SerialServer1;
+SerialServerClass SerialServer1(Serial1);
 #endif
 
 #if defined(HAVE_HWSERIAL2)
-bool _SerialServer2::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
-	Serial2.write(request);
-	Serial2.write('\r');
-	uint32_t start_time = millis();
-	uint16_t tmp_buf_size = (size+Serializer.padding()) * 3;
-	char tmp_buf[tmp_buf_size];
-	memset(tmp_buf, 0, tmp_buf_size);
-	uint16_t i=0;
-	while ((millis() - start_time) < timeout) {
-		if (Serial2.available() > 0) {
-			scratch = Serial.read();
-			tmp_buf[i] = scratch;
-			i++;
-			if ((scratch == 0) && (i > 1)) {
-				if (tmp_buf[i-2] == 0){ // footer conditions are met, try update variables
-					// this command only updates the object after header, checksum and footer are verified
-					// so object can be reasonably assumed to always contain valid data
-					int status = Serializer.unpack(tmp_buf, response, size);
-					switch (status){
-					case OK:
-						return true;
-					case INCOMPLETE_PACKET: // means checksum in buffer is 0 but calculated isn't. indicates not recieved whole packet yet
-						break;
-					case CHECKSUM_FAILED:
-						return false;
-					case FOOTER_MISSING:
-						return false;
-					}
-					if (i >= tmp_buf_size) {
-						return false;
-					}
-				}
-			}
-		}
-	}
-	return false;
-}
-
-void _SerialServer2::handle_requests() {
-	while (Serial2.available() > 0) {
-		scratch = Serial2.read();
-		switch (scratch) {
-			case '\r': // carraige return
-			case '\n': // linefeed
-				if (strlen(rec_buf) > 0) {
-					if (queue != NULL) {
-						response_t* last;
-						response_t* next = queue;
-						while (next != NULL) {
-							last = next;
-							if (strcmp(last->request, rec_buf) == 0) {
-								char buf[last->size + Serializer.padding()];
-								Serializer.pack(buf, last->response, last->size);
-								Serial2.write(buf, last->size + Serializer.padding());
-							}
-							next = (response_t*)last->next;
-						}
-					}
-				}
-				rec_index = 0;
-				memset(rec_buf, 0, rec_buf_size);
-				break;
-			default:
-				rec_buf[rec_index] = scratch;
-				rec_index++;
-				if (rec_index >= rec_buf_size) {
-					rec_index = 0;
-					memset(rec_buf, 0, rec_buf_size);
-				}
-		}
-	}
-}
-
-_SerialServer2 SerialServer2;
+SerialServerClass SerialServer2(Serial2);
 #endif
 
 #if defined(HAVE_HWSERIAL3)
-bool _SerialServer3::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
-	Serial3.write(request);
-	Serial3.write('\r');
-	uint32_t start_time = millis();
-	uint16_t tmp_buf_size = (size+Serializer.padding()) * 3;
-	char tmp_buf[tmp_buf_size];
-	memset(tmp_buf, 0, tmp_buf_size);
-	uint16_t i=0;
-	while ((millis() - start_time) < timeout) {
-		if (Serial3.available() > 0) {
-			scratch = Serial.read();
-			tmp_buf[i] = scratch;
-			i++;
-			if ((scratch == 0) && (i > 1)) {
-				if (tmp_buf[i-2] == 0){ // footer conditions are met, try update variables
-					// this command only updates the object after header, checksum and footer are verified
-					// so object can be reasonably assumed to always contain valid data
-					int status = Serializer.unpack(tmp_buf, response, size);
-					switch (status){
-					case OK:
-						return true;
-					case INCOMPLETE_PACKET: // means checksum in buffer is 0 but calculated isn't. indicates not recieved whole packet yet
-						break;
-					case CHECKSUM_FAILED:
-						return false;
-					case FOOTER_MISSING:
-						return false;
-					}
-					if (i >= tmp_buf_size) {
-						return false;
-					}
-				}
-			}
-		}
-	}
-	return false;
-}
-
-void _SerialServer3::handle_requests() {
-	while (Serial3.available() > 0) {
-		scratch = Serial3.read();
-		switch (scratch) {
-			case '\r': // carraige return
-			case '\n': // linefeed
-				if (strlen(rec_buf) > 0) {
-					if (queue != NULL) {
-						response_t* last;
-						response_t* next = queue;
-						while (next != NULL) {
-							last = next;
-							if (strcmp(last->request, rec_buf) == 0) {
-								char buf[last->size + Serializer.padding()];
-								Serializer.pack(buf, last->response, last->size);
-								Serial3.write(buf, last->size + Serializer.padding());
-							}
-							next = (response_t*)last->next;
-						}
-					}
-				}
-				rec_index = 0;
-				memset(rec_buf, 0, rec_buf_size);
-				break;
-			default:
-				rec_buf[rec_index] = scratch;
-				rec_index++;
-				if (rec_index >= rec_buf_size) {
-					rec_index = 0;
-					memset(rec_buf, 0, rec_buf_size);
-				}
-		}
-	}
-}
-
-_SerialServer3 SerialServer3;
+SerialServerClass SerialServer3(Serial3);
 #endif
