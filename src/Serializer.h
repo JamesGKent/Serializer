@@ -14,10 +14,14 @@ public:
 	
 	uint8_t padding();
 	
-	uint8_t headerlength = 2;
-	uint8_t footerlength = 2;
+	void headerlength(uint8_t headerlength);
+	uint8_t headerlength();
+	void footerlength(uint8_t footerlength);
+	uint8_t footerlength();
 	
 private:
+	uint8_t headlength = 2;
+	uint8_t footlength = 2;
 	uint8_t checksumlength = 1;
 };
 

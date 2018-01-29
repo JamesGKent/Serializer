@@ -11,6 +11,8 @@ SerialServerClass	KEYWORD1
 # Methods and Functions (KEYWORD2)
 #######################################
 
+headerlength	KEYWORD2
+footerlength	KEYWORD2
 pack	KEYWORD2
 unpack	KEYWORD2
 add_response	KEYWORD2

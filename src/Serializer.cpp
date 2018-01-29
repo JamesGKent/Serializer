@@ -3,7 +3,7 @@
 
 void _Serializer::pack(Stream &port, void* data, uint16_t size) {
 	uint8_t checksum = 0;
-	for (uint8_t i=0; i<headerlength; i++)
+	for (uint8_t i=0; i<headlength; i++)
 		port.write((char)255);
 	char* buf = (char*)data;
 	port.write(buf, size);
@@ -11,54 +11,83 @@ void _Serializer::pack(Stream &port, void* data, uint16_t size) {
 		checksum ^= buf[i];
 	}
 	port.write(checksum);
-	for (uint8_t i=0; i<footerlength; i++)
+	for (uint8_t i=0; i<footlength; i++)
 		port.write((uint8_t)0);
 }
 
 void _Serializer::pack(char buffer[], void* data, uint16_t size) {
     uint8_t checksum = 0;
-	for (uint8_t i=0; i<headerlength; i++)
+	for (uint8_t i=0; i<headlength; i++)
 		buffer[i] = (char)255;
-    memcpy(&buffer[headerlength], data, size);
-    for (uint16_t i=headerlength; i<size+headerlength; i++)
+    memcpy(&buffer[headlength], data, size);
+    for (uint16_t i=headlength; i<size+headlength; i++)
         checksum ^= buffer[i];
-    buffer[headerlength+size] = checksum;
-	for (uint16_t i=headerlength+size+1; i<size+padding(); i++)
+    buffer[headlength+size] = checksum;
+	for (uint16_t i=headlength+size+1; i<size+padding(); i++)
 		buffer[i] = (char)0;
 };
 
 SerializerStatus _Serializer::unpack(char buffer[], void* data, uint16_t size) {
-    uint16_t i;
-    uint16_t index=0;
-	// fix this for variable length header
-    for (i=0; i<size+padding()-1; i++){ // check for header bytes
-        if ((buffer[i] == (char)255) && (buffer[i+1] == (char)255)) {
-            index = i+2;
-            break;
-        }
+	uint16_t i, j;
+	uint16_t index=0;
+	bool headervalid;
+	for (i=0; i<size+padding()-1; i++){ // check for header bytes
+		headervalid = true;
+		for (j=0; j<headlength; j++) {
+			if (buffer[i+j] != (char)255) {
+				headervalid = false;
+				break;
+			}
+		}
+		if (headervalid) {
+			index = i+headlength;
+			break;
+		}
 	}
 	if (index==0)
 		return INCOMPLETE_PACKET;
-    uint8_t checksum=0;
-    for (uint16_t i=index; i<size+index; i++){
-        checksum ^= buffer[i];
-    }
-	
-    if (checksum == buffer[index+size]) {
-		// fix this for variable length footer
-		if ((buffer[index+1+size] == (char)0) && (buffer[index+2+size] == (char)0)) {
+	uint8_t checksum=0;
+	for (uint16_t i=index; i<size+index; i++){
+		checksum ^= buffer[i];
+	}
+
+	if (checksum == buffer[index+size]) {
+		bool footervalid = true;
+		for (j=index+size+1; j<index+size+1+footlength; j++) {
+			if (buffer[j] != (char)0) {
+				footervalid = false;
+				break;
+			}
+		}
+		if (footervalid) {
 			memcpy(data, &buffer[index], size);
 			return OK;
 		}
 		return FOOTER_MISSING;
-    } else if (buffer[index+size] == (char)0){
+	} else if (buffer[index+size] == (char)0){
 		return INCOMPLETE_PACKET;
 	}
-    return CHECKSUM_FAILED;
+	return CHECKSUM_FAILED;
 }
 
 uint8_t _Serializer::padding() {
-	return headerlength + checksumlength + footerlength;
+	return headlength + checksumlength + footlength;
+}
+
+void _Serializer::headerlength(uint8_t headerlength) {
+	headlength = headerlength;
+}
+
+uint8_t _Serializer::headerlength() {
+	return headlength;
+}
+
+void _Serializer::footerlength(uint8_t footerlength) {
+	footlength = footerlength;
+}
+
+uint8_t _Serializer::footerlength() {
+	return footlength;
 }
 
 _Serializer Serializer;
