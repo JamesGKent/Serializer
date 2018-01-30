@@ -96,6 +96,17 @@ SerialServerClass::SerialServerClass(Stream &port) {
 	ser = &port;
 }
 
+void SerialServerClass::resize_recieve_buffer(char request[]) {
+	if ((strlen(request)*2)>rec_buf_size)
+		rec_buf_size = strlen(request)*2;
+		if (rec_buf != NULL)
+			delete rec_buf;
+	if (rec_buf == NULL) {
+		rec_buf = new char[rec_buf_size];
+		memset(*rec_buf, 0, rec_buf_size);
+	}
+}
+
 response_t* SerialServerClass::add_response() {
 	if (queue == NULL){
 		queue = new response_t;
@@ -115,30 +126,31 @@ response_t* SerialServerClass::add_response() {
 	}
 }
 
-void SerialServerClass::add_response(char request[], void* response, uint16_t size) {
+void SerialServerClass::add_response(char request[], void* response, uint16_t size, bool startswith) {
 	response_t* resp = add_response();
 	resp->request = request;
+	resp->startswith = startswith;
 	resp->response = response;
 	resp->size = size;
-	if ((strlen(request)*2)>rec_buf_size)
-		rec_buf_size = strlen(request)*2;
-		if (rec_buf != NULL)
-			delete rec_buf;
-	if (rec_buf == NULL)
-		rec_buf = new char[rec_buf_size];
+	resize_recieve_buffer(request);
 }
 
-void SerialServerClass::add_response(char request[], void (*function)(void)) {
+void SerialServerClass::add_response(char request[], void (*function)(void), bool startswith) {
 	response_t* resp = add_response();
 	resp->request = request;
-	resp->size = 0;
-	resp->function = function;
-	if ((strlen(request)*2)>rec_buf_size)
-		rec_buf_size = strlen(request)*2;
-		if (rec_buf != NULL)
-			delete rec_buf;
-	if (rec_buf == NULL)
-		rec_buf = new char[rec_buf_size];
+	resp->startswith = startswith;
+	resp->size = 0; // indicates function call
+	resp->voidfunction = function;
+	resize_recieve_buffer(request);
+}
+
+void SerialServerClass::add_response(char request[], void (*function)(char *), bool startswith) {
+	response_t* resp = add_response();
+	resp->request = request;
+	resp->startswith = startswith;
+	resp->size = 0; // indicates function call
+	resp->charfunction = function;
+	resize_recieve_buffer(request);
 }
 
 periodical_t* SerialServerClass::add_periodical() {
@@ -189,8 +201,14 @@ bool SerialServerClass::recieve(void* response, uint16_t size, uint32_t timeout)
 			scratch = ser->read();
 			tmp_buf[i] = scratch;
 			i++;
-			if ((scratch == 0) && (i > 1)) {
-				if (tmp_buf[i-2] == 0){ // footer conditions are met, try update variables
+			if (i > Serializer.footerlength()) {
+				bool footervalid = true;
+				for (uint16_t j=0; j<Serializer.footerlength(); j++) {
+					if (tmp_buf[i-j] != 0) {
+						footervalid = false;
+					}
+				}
+				if (footervalid) {
 					// this command only updates the object after header, checksum and footer are verified
 					// so object can be reasonably assumed to always contain valid data
 					int status = Serializer.unpack(tmp_buf, response, size);
@@ -226,11 +244,27 @@ void SerialServerClass::handle_requests() {
 						response_t* next = queue;
 						while (next != NULL) {
 							last = next;
-							if (strcmp(last->request, rec_buf) == 0) {
-								if (last->size == 0) {
-									(*last->function)();
-								} else {
-									Serializer.pack(*ser, last->response, last->size);
+							if (last->startswith) {
+								if (strncmp(last->request, rec_buf, strlen(last->request)) == 0) {
+									if (last->size == 0) {
+										if (last->charfunction != NULL)
+											(*last->charfunction)(rec_buf);
+										else if (last->voidfunction != NULL)
+											(*last->voidfunction)();
+									} else {
+										Serializer.pack(*ser, last->response, last->size);
+									}
+								}
+							} else {
+								if (strcmp(last->request, rec_buf) == 0) {
+									if (last->size == 0) {
+										if (last->charfunction != NULL)
+											(*last->charfunction)(rec_buf);
+										else if (last->voidfunction != NULL)
+											(*last->voidfunction)();
+									} else {
+										Serializer.pack(*ser, last->response, last->size);
+									}
 								}
 							}
 							next = (response_t*)last->next;

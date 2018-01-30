@@ -29,8 +29,10 @@ extern _Serializer Serializer;
 
 typedef struct {
 	char* request;
+	bool startswith;
 	void* response;
-	void (*function)(void);
+	void (*voidfunction)(void);
+	void (*charfunction)(char *);
 	uint16_t size;
 	void* next;
 } response_t;
@@ -46,14 +48,16 @@ typedef struct {
 class SerialServerClass {
 public:
 	SerialServerClass(Stream &port);
-	void add_response(char request[], void* response, uint16_t size);
-	void add_response(char request[], void (*function)(void));
+	void add_response(char request[], void* response, uint16_t size, bool startswith=false);
+	void add_response(char request[], void (*function)(void), bool startswith=false);
+	void add_response(char request[], void (*function)(char *), bool startswith=false);
 	bool make_request(char request[], void* response, uint16_t size, uint32_t timeout=1000);
 	bool send_periodically(void* response, uint16_t size, uint32_t period);
 	bool send(void* response, uint16_t size);
 	bool recieve(void* response, uint16_t size, uint32_t timeout=1000);
 	void handle_requests();
 private:
+	void resize_recieve_buffer(char request[]);
 	response_t* add_response(); // adds empty response to the queue
 	
 	periodical_t* add_periodical(); 
