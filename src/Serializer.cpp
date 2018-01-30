@@ -101,10 +101,8 @@ void SerialServerClass::resize_recieve_buffer(char request[]) {
 		rec_buf_size = strlen(request)*2;
 		if (rec_buf != NULL)
 			delete rec_buf;
-	if (rec_buf == NULL) {
+	if (rec_buf == NULL)
 		rec_buf = new char[rec_buf_size];
-		memset(&rec_buf, 0, rec_buf_size);
-	}
 }
 
 response_t* SerialServerClass::add_response() {
