@@ -97,21 +97,27 @@ SerialServerClass::SerialServerClass(Stream &port) {
 }
 
 void SerialServerClass::resize_recieve_buffer(char request[]) {
-	if ((strlen(request)*2)>rec_buf_size)
-		rec_buf_size = strlen(request)*2;
+	uint16_t len = strlen(request);
+	if ((len*2)>rec_buf_size) {
+		rec_buf_size = len*2;
 		if (rec_buf != NULL)
 			delete rec_buf;
+	}
 	if (rec_buf == NULL)
 		rec_buf = new char[rec_buf_size];
 }
 
-response_t* SerialServerClass::add_response() {
+response_t* SerialServerClass::_add_response(char request[], uint16_t size, bool startswith) {
+	response_t* resp = new response_t;
+	resp->request = request;
+	resp->size = size;
+	resp->startswith = startswith;
+	resp->voidfunction = NULL;
+	resp->charfunction = NULL;
+	resp->next = NULL;
 	if (queue == NULL){
-		queue = new response_t;
-		queue->next = NULL;
-		return queue;
+		queue = resp;
 	} else {
-		response_t* resp = new response_t;
 		response_t* last;
 		response_t* next = queue;
 		while (next != NULL) {
@@ -119,47 +125,34 @@ response_t* SerialServerClass::add_response() {
 			next = (response_t*)last->next;
 		}
 		last->next = resp;
-		resp->next = NULL;
-		return resp;
 	}
+	return resp;
 }
 
 void SerialServerClass::add_response(char request[], void* response, uint16_t size, bool startswith) {
-	response_t* resp = add_response();
-	resp->request = request;
-	resp->startswith = startswith;
+	response_t* resp = _add_response(request, size, startswith);
 	resp->response = response;
-	resp->size = size;
 	resize_recieve_buffer(request);
 }
 
 void SerialServerClass::add_response(char request[], void (*function)(void), bool startswith) {
-	response_t* resp = add_response();
-	resp->request = request;
-	resp->startswith = startswith;
-	resp->size = 0; // indicates function call
+	response_t* resp = _add_response(request, 0, startswith);
 	resp->voidfunction = function;
-	resp->charfunction = NULL;
 	resize_recieve_buffer(request);
 }
 
 void SerialServerClass::add_response(char request[], void (*function)(char *), bool startswith) {
-	response_t* resp = add_response();
-	resp->request = request;
-	resp->startswith = startswith;
-	resp->size = 0; // indicates function call
+	response_t* resp = _add_response(request, 0, startswith);
 	resp->charfunction = function;
-	resp->voidfunction = NULL;
 	resize_recieve_buffer(request);
 }
 
 periodical_t* SerialServerClass::add_periodical() {
+	periodical_t* per = new periodical_t;
+	per->next = NULL;
 	if (periodicals == NULL){
-		periodicals = new periodical_t;
-		periodicals->next = NULL;
-		return periodicals;
+		periodicals = per;
 	} else {
-		periodical_t* per = new periodical_t;
 		periodical_t* last;
 		periodical_t* next = periodicals;
 		while (next != NULL) {
@@ -167,9 +160,8 @@ periodical_t* SerialServerClass::add_periodical() {
 			next = (periodical_t*)last->next;
 		}
 		last->next = per;
-		per->next = NULL;
-		return per;
 	}
+	return per;
 }
 
 bool SerialServerClass::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
@@ -258,11 +250,8 @@ void SerialServerClass::handle_requests() {
 								break;
 							}
 						} else {
-							ser->println("complete matching");
 							if (strcmp(last->request, rec_buf) == 0) {
-								ser->println("matched");
 								if (last->size == 0) {
-									ser->println("calling function");
 									if (last->charfunction != NULL)
 										(*last->charfunction)(rec_buf);
 									else if (last->voidfunction != NULL)
@@ -295,6 +284,18 @@ void SerialServerClass::handle_requests() {
 			last->last_sent = millis();
 		};
 		next = (periodical_t*)last->next;
+	}
+}
+
+void SerialServerClass::list_responses() {
+	response_t* last;
+	response_t* next = queue;
+	ser->println("Listing responses:");
+	while (next != NULL) {
+		last = next;
+		ser->print("request: ");
+		ser->println(last->request);
+		next = (response_t*)last->next;
 	}
 }
 

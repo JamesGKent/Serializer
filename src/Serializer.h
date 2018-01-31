@@ -56,9 +56,10 @@ public:
 	bool send(void* response, uint16_t size);
 	bool recieve(void* response, uint16_t size, uint32_t timeout=1000);
 	void handle_requests();
+	void list_responses();
 private:
 	void resize_recieve_buffer(char request[]);
-	response_t* add_response(); // adds empty response to the queue
+	response_t* _add_response(char request[], uint16_t size, bool startswith); // adds empty response to the queue
 	
 	periodical_t* add_periodical(); 
 	
