@@ -139,6 +139,7 @@ void SerialServerClass::add_response(char request[], void (*function)(void), boo
 	resp->startswith = startswith;
 	resp->size = 0; // indicates function call
 	resp->voidfunction = function;
+	resp->charfunction = NULL;
 	resize_recieve_buffer(request);
 }
 
@@ -148,6 +149,7 @@ void SerialServerClass::add_response(char request[], void (*function)(char *), b
 	resp->startswith = startswith;
 	resp->size = 0; // indicates function call
 	resp->charfunction = function;
+	resp->voidfunction = NULL;
 	resize_recieve_buffer(request);
 }
 
@@ -234,51 +236,54 @@ void SerialServerClass::handle_requests() {
 	while (ser->available() > 0) {
 		scratch = ser->read();
 		switch (scratch) {
-			case '\r': // carraige return
-			case '\n': // linefeed
-				if (strlen(rec_buf) > 0) {
-					if (queue != NULL) {
-						response_t* last;
-						response_t* next = queue;
-						while (next != NULL) {
-							last = next;
-							if (last->startswith) {
-								if (strncmp(last->request, rec_buf, strlen(last->request)) == 0) {
-									if (last->size == 0) {
-										if (last->charfunction != NULL)
-											(*last->charfunction)(rec_buf);
-										else if (last->voidfunction != NULL)
-											(*last->voidfunction)();
-									} else {
-										Serializer.pack(*ser, last->response, last->size);
-									}
+		case '\r': // carraige return
+		case '\n': // linefeed
+			rec_buf[rec_index] = (char)0;
+			if (strlen(rec_buf) > 0) {
+				if (queue != NULL) {
+					response_t* last;
+					response_t* next = queue;
+					while (next != NULL) {
+						last = next;
+						if (last->startswith) {
+							if (strncmp(last->request, rec_buf, strlen(last->request)) == 0) {
+								if (last->size == 0) {
+									if (last->charfunction != NULL)
+										(*last->charfunction)(rec_buf);
+									else if (last->voidfunction != NULL)
+										(*last->voidfunction)();
+								} else {
+									Serializer.pack(*ser, last->response, last->size);
 								}
-							} else {
-								if (strcmp(last->request, rec_buf) == 0) {
-									if (last->size == 0) {
-										if (last->charfunction != NULL)
-											(*last->charfunction)(rec_buf);
-										else if (last->voidfunction != NULL)
-											(*last->voidfunction)();
-									} else {
-										Serializer.pack(*ser, last->response, last->size);
-									}
-								}
+								break;
 							}
-							next = (response_t*)last->next;
+						} else {
+							ser->println("complete matching");
+							if (strcmp(last->request, rec_buf) == 0) {
+								ser->println("matched");
+								if (last->size == 0) {
+									ser->println("calling function");
+									if (last->charfunction != NULL)
+										(*last->charfunction)(rec_buf);
+									else if (last->voidfunction != NULL)
+										(*last->voidfunction)();
+								} else {
+									Serializer.pack(*ser, last->response, last->size);
+								}
+								break;
+							}
 						}
+						next = (response_t*)last->next;
 					}
 				}
+			}
+			rec_index = 0;
+			break;
+		default:
+			rec_buf[rec_index] = scratch;
+			rec_index++;
+			if (rec_index >= rec_buf_size)
 				rec_index = 0;
-				memset(rec_buf, 0, rec_buf_size);
-				break;
-			default:
-				rec_buf[rec_index] = scratch;
-				rec_index++;
-				if (rec_index >= rec_buf_size) {
-					rec_index = 0;
-					memset(rec_buf, 0, rec_buf_size);
-				}
 		}
 	}
 	periodical_t* last;
