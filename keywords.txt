@@ -16,10 +16,14 @@ footerlength	KEYWORD2
 pack	KEYWORD2
 unpack	KEYWORD2
 add_response	KEYWORD2
+enable_response	KEYWORD2
+num_responses	KEYWORD2
 make_request	KEYWORD2
 send	KEYWORD2
 recieve	KEYWORD2
 handle_requests	KEYWORD2
+obey_backspace	KEYWORD2
+resize_recieve_buffer	KEYWORD2
 
 #######################################
 # Instances (KEYWORD2)
