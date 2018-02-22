@@ -57,11 +57,16 @@ public:
 	bool recieve(void* response, uint16_t size, uint32_t timeout=1000);
 	void handle_requests();
 	void list_responses();
+	bool obey_backspace();
+	void obey_backspace(bool obey=false);
+	void resize_recieve_buffer(uint16_t size);
 private:
 	void resize_recieve_buffer(char request[]);
 	response_t* _add_response(char request[], uint16_t size, bool startswith); // adds empty response to the queue
 	
 	periodical_t* add_periodical(); 
+	
+	bool _obey_backspace=false;
 	
 	Stream* ser; // reference to the port in use
 	response_t* queue=NULL; // list of all the responses

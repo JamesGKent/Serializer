@@ -107,6 +107,14 @@ void SerialServerClass::resize_recieve_buffer(char request[]) {
 		rec_buf = new char[rec_buf_size];
 }
 
+void SerialServerClass::resize_recieve_buffer(uint16_t size) {
+	rec_buf_size = size;
+	if (rec_buf != NULL)
+		delete rec_buf;
+	if (rec_buf == NULL)
+		rec_buf = new char[rec_buf_size];
+}
+
 response_t* SerialServerClass::_add_response(char request[], uint16_t size, bool startswith) {
 	response_t* resp = new response_t;
 	resp->request = request;
@@ -268,6 +276,13 @@ void SerialServerClass::handle_requests() {
 			}
 			rec_index = 0;
 			break;
+		case '\b':
+			if (_obey_backspace) {
+				if (rec_index > 0) // prevent underflow
+					rec_index--;
+				rec_buf[rec_index] = (char)0;
+				break;
+			} // else flow into default
 		default:
 			rec_buf[rec_index] = scratch;
 			rec_index++;
@@ -285,6 +300,14 @@ void SerialServerClass::handle_requests() {
 		};
 		next = (periodical_t*)last->next;
 	}
+}
+
+bool SerialServerClass::obey_backspace() {
+	return _obey_backspace;
+}
+
+void SerialServerClass::obey_backspace(bool obey) {
+	_obey_backspace = obey;
 }
 
 void SerialServerClass::list_responses() {
