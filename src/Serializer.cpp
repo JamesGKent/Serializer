@@ -115,15 +115,17 @@ void SerialServerClass::resize_recieve_buffer(uint16_t size) {
 		rec_buf = new char[rec_buf_size];
 }
 
-response_t* SerialServerClass::_add_response(char request[], uint16_t size, bool startswith) {
+response_t* SerialServerClass::_add_response(char request[], uint16_t size, bool startswith, bool enabled) {
 	response_t* resp = new response_t;
 	resp->request = request;
 	resp->size = size;
 	resp->startswith = startswith;
+	resp->enabled = enabled;
 	resp->voidfunction = NULL;
 	resp->charfunction = NULL;
 	resp->next = NULL;
 	if (queue == NULL){
+		resp->ID = 1;
 		queue = resp;
 	} else {
 		response_t* last;
@@ -132,27 +134,52 @@ response_t* SerialServerClass::_add_response(char request[], uint16_t size, bool
 			last = next;
 			next = (response_t*)last->next;
 		}
+		resp->ID = last->ID + 1;
 		last->next = resp;
 	}
 	return resp;
 }
 
-void SerialServerClass::add_response(char request[], void* response, uint16_t size, bool startswith) {
-	response_t* resp = _add_response(request, size, startswith);
+uint8_t SerialServerClass::add_response(char request[], void* response, uint16_t size, bool startswith, bool enabled) {
+	response_t* resp = _add_response(request, size, startswith, enabled);
 	resp->response = response;
 	resize_recieve_buffer(request);
+	return resp->ID;
 }
 
-void SerialServerClass::add_response(char request[], void (*function)(void), bool startswith) {
-	response_t* resp = _add_response(request, 0, startswith);
+uint8_t SerialServerClass::add_response(char request[], void (*function)(void), bool startswith, bool enabled) {
+	response_t* resp = _add_response(request, 0, startswith, enabled);
 	resp->voidfunction = function;
 	resize_recieve_buffer(request);
+	return resp->ID;
 }
 
-void SerialServerClass::add_response(char request[], void (*function)(char *), bool startswith) {
-	response_t* resp = _add_response(request, 0, startswith);
+uint8_t SerialServerClass::add_response(char request[], void (*function)(char *), bool startswith, bool enabled) {
+	response_t* resp = _add_response(request, 0, startswith, enabled);
 	resp->charfunction = function;
 	resize_recieve_buffer(request);
+	return resp->ID;
+}
+
+void SerialServerClass::enable_response(uint8_t ID, bool enabled) {
+	response_t* last;
+	response_t* next = queue;
+	while (next != NULL) {
+		last = next;
+		if (last->ID == ID)
+			last->enabled = enabled;
+		next = (response_t*)last->next;
+	}
+}
+
+uint8_t SerialServerClass::num_responses() {
+	response_t* last;
+	response_t* next = queue;
+	while (next != NULL) {
+		last = next;
+		next = (response_t*)last->next;
+	}
+	return last->ID;
 }
 
 periodical_t* SerialServerClass::add_periodical() {
@@ -245,29 +272,31 @@ void SerialServerClass::handle_requests() {
 					response_t* next = queue;
 					while (next != NULL) {
 						last = next;
-						if (last->startswith) {
-							if (strncmp(last->request, rec_buf, strlen(last->request)) == 0) {
-								if (last->size == 0) {
-									if (last->charfunction != NULL)
-										(*last->charfunction)(rec_buf);
-									else if (last->voidfunction != NULL)
-										(*last->voidfunction)();
-								} else {
-									Serializer.pack(*ser, last->response, last->size);
+						if (last->enabled) {
+							if (last->startswith) {
+								if (strncmp(last->request, rec_buf, strlen(last->request)) == 0) {
+									if (last->size == 0) {
+										if (last->charfunction != NULL)
+											(*last->charfunction)(rec_buf);
+										else if (last->voidfunction != NULL)
+											(*last->voidfunction)();
+									} else {
+										Serializer.pack(*ser, last->response, last->size);
+									}
+									break;
 								}
-								break;
-							}
-						} else {
-							if (strcmp(last->request, rec_buf) == 0) {
-								if (last->size == 0) {
-									if (last->charfunction != NULL)
-										(*last->charfunction)(rec_buf);
-									else if (last->voidfunction != NULL)
-										(*last->voidfunction)();
-								} else {
-									Serializer.pack(*ser, last->response, last->size);
+							} else {
+								if (strcmp(last->request, rec_buf) == 0) {
+									if (last->size == 0) {
+										if (last->charfunction != NULL)
+											(*last->charfunction)(rec_buf);
+										else if (last->voidfunction != NULL)
+											(*last->voidfunction)();
+									} else {
+										Serializer.pack(*ser, last->response, last->size);
+									}
+									break;
 								}
-								break;
 							}
 						}
 						next = (response_t*)last->next;
