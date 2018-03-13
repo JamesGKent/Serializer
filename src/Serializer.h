@@ -50,11 +50,15 @@ typedef struct {
 class SerialServerClass {
 public:
 	SerialServerClass(Stream &port);
+	uint8_t add_response(const char request[], void* response, uint16_t size, bool startswith=false, bool enabled=true);
 	uint8_t add_response(char request[], void* response, uint16_t size, bool startswith=false, bool enabled=true);
+	uint8_t add_response(const char request[], void (*function)(void), bool startswith=false, bool enabled=true);
 	uint8_t add_response(char request[], void (*function)(void), bool startswith=false, bool enabled=true);
+	uint8_t add_response(const char request[], void (*function)(char *), bool startswith=false, bool enabled=true);
 	uint8_t add_response(char request[], void (*function)(char *), bool startswith=false, bool enabled=true);
 	void enable_response(uint8_t ID, bool enabled);
 	uint8_t num_responses();
+	bool make_request(const char request[], void* response, uint16_t size, uint32_t timeout=1000);
 	bool make_request(char request[], void* response, uint16_t size, uint32_t timeout=1000);
 	bool send_periodically(void* response, uint16_t size, uint32_t period);
 	bool send(void* response, uint16_t size);

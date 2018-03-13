@@ -140,6 +140,10 @@ response_t* SerialServerClass::_add_response(char request[], uint16_t size, bool
 	return resp;
 }
 
+uint8_t SerialServerClass::add_response(const char request[], void* response, uint16_t size, bool startswith, bool enabled) {
+	return add_response((char*)request, response, size, startswith, enabled);
+}
+
 uint8_t SerialServerClass::add_response(char request[], void* response, uint16_t size, bool startswith, bool enabled) {
 	response_t* resp = _add_response(request, size, startswith, enabled);
 	resp->response = response;
@@ -147,11 +151,19 @@ uint8_t SerialServerClass::add_response(char request[], void* response, uint16_t
 	return resp->ID;
 }
 
+uint8_t SerialServerClass::add_response(const char request[], void (*function)(void), bool startswith, bool enabled) {
+	return add_response((char*)request, function, startswith, enabled);
+}
+
 uint8_t SerialServerClass::add_response(char request[], void (*function)(void), bool startswith, bool enabled) {
 	response_t* resp = _add_response(request, 0, startswith, enabled);
 	resp->voidfunction = function;
 	resize_recieve_buffer(request);
 	return resp->ID;
+}
+
+uint8_t SerialServerClass::add_response(const char request[], void (*function)(char *), bool startswith, bool enabled) {
+	return add_response((char*)request, function, startswith, enabled);
 }
 
 uint8_t SerialServerClass::add_response(char request[], void (*function)(char *), bool startswith, bool enabled) {
@@ -197,6 +209,10 @@ periodical_t* SerialServerClass::add_periodical() {
 		last->next = per;
 	}
 	return per;
+}
+
+bool SerialServerClass::make_request(const char request[], void* response, uint16_t size, uint32_t timeout) {
+	return make_request((char*)request, response, size, timeout);
 }
 
 bool SerialServerClass::make_request(char request[], void* response, uint16_t size, uint32_t timeout) {
